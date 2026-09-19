@@ -132,6 +132,7 @@ body { background:var(--bg); color:var(--text); font-family:'Inter',-apple-syste
     <button class="chip" onclick="quick('BTC.X')">BTC</button>
     <button class="chip" onclick="quick('ETH.X')">ETH</button>
   </div>
+  <div id="trending-bar" style="margin-top:12px;font-size:12px;color:var(--text3);"></div>
 </div>
 
 <div class="container">
@@ -140,6 +141,20 @@ body { background:var(--bg); color:var(--text); font-family:'Inter',-apple-syste
 
 <script>
 var loading = false;
+
+// Load trending from StockTwits on page load
+fetch('https://api.stocktwits.com/api/2/trending/symbols.json?limit=10')
+  .then(function(r){ return r.json(); })
+  .then(function(d){
+    var syms = (d.symbols || []).slice(0,8);
+    if (!syms.length) return;
+    var bar = document.getElementById('trending-bar');
+    if (!bar) return;
+    bar.innerHTML = '🔥 Trending: ' + syms.map(function(s){
+      return '<button class="chip" onclick="quick(\''+s.symbol+'\')" style="margin:2px;">'+s.symbol+'</button>';
+    }).join('');
+  })
+  .catch(function(){});
 
 function quick(sym) {
   document.getElementById('ticker-input').value = sym;
@@ -285,9 +300,10 @@ function renderResults(d) {
         </div>
       </div>
 
+      <div style="font-size:10px;color:var(--text3);margin-top:14px;margin-bottom:6px;text-transform:uppercase;letter-spacing:.06em;">Tagged Sentiment (users who explicitly labeled their post)</div>
       <div class="sentiment-bars">
         <div class="bar-row">
-          <div class="bar-label" style="color:var(--green)">Bullish</div>
+          <div class="bar-label" style="color:var(--green)">Bull</div>
           <div class="bar-track"><div class="bar-fill" style="width:${d.bullPct}%;background:var(--green)"></div></div>
           <div class="bar-pct">${d.bullPct}%</div>
         </div>
@@ -297,11 +313,12 @@ function renderResults(d) {
           <div class="bar-pct">${d.neutralPct}%</div>
         </div>
         <div class="bar-row">
-          <div class="bar-label" style="color:var(--red)">Bearish</div>
+          <div class="bar-label" style="color:var(--red)">Bear</div>
           <div class="bar-track"><div class="bar-fill" style="width:${d.bearPct}%;background:var(--red)"></div></div>
           <div class="bar-pct">${d.bearPct}%</div>
         </div>
       </div>
+      <div style="font-size:10px;color:var(--text3);margin-top:6px;">⚡ AI themes below are extracted from ALL message content including untagged posts</div>
 
       <div class="stats-row">
         <div class="stat"><div class="stat-val">${d.totalMessages}</div><div class="stat-label">Messages (30 recent)</div></div>
