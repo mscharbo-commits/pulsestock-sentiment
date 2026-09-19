@@ -182,8 +182,11 @@ async function fetchAISummary(data) {
     });
     var resp = await r.json();
     var text = resp.content && resp.content[0] && resp.content[0].text || '';
-    var clean = text.replace(/```json|```/g, '').trim();
-    var parsed = JSON.parse(clean);
+    // Extract JSON from anywhere in response
+    var jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) throw new Error('No JSON in response');
+    var parsed = JSON.parse(jsonMatch[0]);
+    if (!parsed.summary) throw new Error('Missing summary field');
     renderAISummary(data.symbol, Object.assign(parsed, {hasAI: true}));
   } catch(e) {
     renderAISummary(data.symbol, {
