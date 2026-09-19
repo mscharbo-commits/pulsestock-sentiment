@@ -26,8 +26,8 @@ export default async function handler(req, res) {
 
   try {
     const sample = (messages || []).slice(0, 10).join('\n');
-    const sentLabel = score >= 60 ? 'BULLISH' : score <= 40 ? 'BEARISH' : 'NEUTRAL/MIXED';
-    const prompt = 'Analyze StockTwits messages for $' + symbol + '.\n\nSENTIMENT LABELS (user-tagged): ' + bullPct + '% explicitly tagged Bullish, ' + bearPct + '% explicitly tagged Bearish, ' + neutralPct + '% untagged/neutral. Overall score: ' + score + '/100 (' + sentLabel + ').\n\nMESSAGE CONTENT (what people are actually saying):\n' + sample + '\n\nIMPORTANT: The summary must reflect the LABEL data first. If bearPct is 0%, do NOT say sentiment is mixed or bearish in the summary. Bull/bear themes should come from the MESSAGE CONTENT but must not contradict the label data. If bearish themes exist in content but 0% bear labels, note them as "concerns" not bearish sentiment.\n\nReturn ONLY this JSON, no other text:\n{"summary":"2 sentences reflecting the ' + sentLabel + ' label data and key message themes","bullThemes":["specific theme from messages"],"bearThemes":["concern or risk mentioned, NOT contradicting label data"],"catalysts":["specific event or catalyst mentioned"]}';
+    const sentLabel = score >= 60 ? 'bullish' : score <= 40 ? 'bearish' : 'mixed';
+    const prompt = 'Analyze StockTwits for $' + symbol + '. Score: ' + score + '/100 (' + bullPct + '% bull-tagged, ' + bearPct + '% bear-tagged). The overall sentiment is ' + sentLabel + '. Messages:\n' + sample + '\n\nReturn ONLY valid JSON:\n{"summary":"2 sentences — start with the ' + sentLabel + ' sentiment reading then describe key themes from messages","bullThemes":["theme1","theme2"],"bearThemes":["concern1"],"catalysts":["catalyst1"]}';
 
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
