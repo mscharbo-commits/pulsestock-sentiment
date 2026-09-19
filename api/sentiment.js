@@ -109,11 +109,22 @@ function detectManipulation(messages) {
 }
 
 async function getAISummary(symbol, sentiment, textSamples) {
-  if (!ANT_KEY || !textSamples.length) return null;
+  // Rule-based fallback summary — always works
+  const fallback = {
+    summary: `${symbol} sentiment is ${sentiment.score >= 60 ? 'bullish' : sentiment.score <= 40 ? 'bearish' : 'mixed'} on StockTwits with ${sentiment.bullPct}% of tagged messages bullish and ${sentiment.bearPct}% bearish. ${sentiment.uniqueAuthors} unique authors contributed to this reading.`,
+    bullThemes: sentiment.bullPct > 20 ? ['Price momentum', 'Community interest'] : [],
+    bearThemes: sentiment.bearPct > 20 ? ['Caution', 'Profit taking'] : [],
+    catalysts: []
+  };
+
+  if (!ANT_KEY || !textSamples.length) return fallback;
   try {
     const sample = textSamples.slice(0, 10).join('\n');
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 8000);
     const r = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         'x-api-key': ANT_KEY,
@@ -122,25 +133,16 @@ async function getAISummary(symbol, sentiment, textSamples) {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
-        messages: [{ role: 'user', content: `Analyze this StockTwits sentiment for ${symbol}.
-Sentiment score: ${sentiment.score}/100 (${sentiment.bullPct}% bull, ${sentiment.bearPct}% bear)
-Sample messages:
-${sample}
-
-Return a JSON object with these fields only:
-{
-  "summary": "2 sentence summary of what the community is saying",
-  "bullThemes": ["theme1", "theme2", "theme3"],
-  "bearThemes": ["theme1", "theme2"],
-  "catalysts": ["catalyst1"]
-}` }]
+        messages: [{ role: 'user', content: `Analyze StockTwits sentiment for ${symbol}. Score: ${sentiment.score}/100 (${sentiment.bullPct}% bull, ${sentiment.bearPct}% bear). Sample messages:\n${sample}\n\nReturn ONLY valid JSON: {"summary":"2 sentences","bullThemes":["theme1","theme2"],"bearThemes":["theme1"],"catalysts":["catalyst1"]}` }]
       })
     });
+    clearTimeout(timeout);
     const data = await r.json();
     const text = data.content?.[0]?.text || '';
     const clean = text.replace(/```json|```/g, '').trim();
-    return JSON.parse(clean);
-  } catch(e) { return null; }
+    const parsed = JSON.parse(clean);
+    return parsed.summary ? parsed : fallback;
+  } catch(e) { return fallback; }
 }
 
 async function getCachedBaseline(symbol) {
