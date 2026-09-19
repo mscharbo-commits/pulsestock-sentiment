@@ -5,6 +5,9 @@
     },
     "api/batch.js": {
       "maxDuration": 60
+    },
+    "api/summary.js": {
+      "maxDuration": 20
     }
   },
   "routes": [
@@ -15,6 +18,10 @@
     {
       "src": "/api/batch",
       "dest": "/api/batch.js"
+    },
+    {
+      "src": "/api/summary",
+      "dest": "/api/summary.js"
     }
   ]
 }
