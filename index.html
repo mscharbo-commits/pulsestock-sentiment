@@ -159,10 +159,47 @@ async function analyze() {
     var data = await r.json();
     if (!r.ok) throw new Error(data.error || 'Failed');
     renderResults(data);
+    // Fetch AI summary separately so it doesn't block main data
+    if (!data.cached) fetchAISummary(data);
   } catch(e) {
     results.innerHTML = '<div class="error-msg">⚠ ' + e.message + '</div>';
   }
   loading = false;
+}
+
+async function fetchAISummary(data) {
+  try {
+    var r = await fetch('/api/summary', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        symbol: data.symbol,
+        score: data.score,
+        bullPct: data.bullPct,
+        bearPct: data.bearPct,
+        messages: data.aiSummary?.textSamples || []
+      })
+    });
+    var summary = await r.json();
+    // Update AI summary section in place
+    renderAISummary(data.symbol, summary);
+  } catch(e) {}
+}
+
+function renderAISummary(symbol, s) {
+  var el = document.getElementById('ai-summary-section');
+  if (!el) return;
+  var bullTags = (s.bullThemes||[]).map(t => '<span class="theme-tag bull">'+t+'</span>').join('');
+  var bearTags = (s.bearThemes||[]).map(t => '<span class="theme-tag bear">'+t+'</span>').join('');
+  var catTags  = (s.catalysts ||[]).map(t => '<span class="theme-tag catalyst-tag">'+t+'</span>').join('');
+  var aiLabel = s.hasAI ? '⚡ AI Summary' : '📊 Summary';
+  el.innerHTML = '<div class="ai-card-title">'+aiLabel+'</div>'
+    + '<div class="ai-summary-text">'+s.summary+'</div>'
+    + '<div class="themes-row">'
+    + (bullTags ? '<div class="theme-col"><div class="theme-col-title" style="color:var(--green)">▲ Bullish Themes</div>'+bullTags+'</div>' : '')
+    + (bearTags ? '<div class="theme-col"><div class="theme-col-title" style="color:var(--red)">▼ Bearish Themes</div>'+bearTags+'</div>' : '')
+    + (catTags  ? '<div class="theme-col"><div class="theme-col-title" style="color:var(--accent)">⚡ Catalysts</div>'+catTags+'</div>' : '')
+    + '</div>';
 }
 
 function scoreClass(score) {
@@ -283,7 +320,10 @@ function renderResults(d) {
       </div>
     </div>
 
-    ${aiHtml}
+    <div class="ai-card fade-in" id="ai-summary-section">
+      <div class="ai-card-title">⚡ AI Summary</div>
+      <div class="ai-summary-text" style="color:var(--text3);">Analyzing community sentiment...</div>
+    </div>
   `;
 }
 </script>
