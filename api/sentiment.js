@@ -201,7 +201,32 @@ export default async function handler(req, res) {
     if (rows?.[0]) {
       const age = Date.now() - new Date(rows[0].created_at).getTime();
       if (age < 15 * 60 * 1000) {
-        return res.status(200).json({ ...rows[0], cached: true });
+        const row = rows[0];
+        // Normalize snake_case DB fields to camelCase for frontend
+        return res.status(200).json({
+          symbol: row.symbol,
+          score: row.score,
+          bullPct: row.bull_pct,
+          bearPct: row.bear_pct,
+          neutralPct: row.neutral_pct,
+          totalMessages: row.total_messages,
+          uniqueAuthors: row.unique_authors,
+          attention: row.attention,
+          momentum: row.momentum,
+          conviction: row.conviction,
+          manipulation: {
+            risk: row.manipulation_risk,
+            flag: row.manipulation_flag
+          },
+          aiSummary: row.summary ? {
+            summary: row.summary,
+            bullThemes: row.bull_themes || [],
+            bearThemes: row.bear_themes || [],
+            catalysts: row.catalysts || []
+          } : null,
+          cached: true,
+          updatedAt: row.created_at
+        });
       }
     }
   } catch(e) {}
