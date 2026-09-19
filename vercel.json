@@ -1,0 +1,20 @@
+{
+  "functions": {
+    "api/sentiment.js": {
+      "maxDuration": 30
+    },
+    "api/batch.js": {
+      "maxDuration": 60
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/sentiment",
+      "dest": "/api/sentiment.js"
+    },
+    {
+      "src": "/api/batch",
+      "dest": "/api/batch.js"
+    }
+  ]
+}
