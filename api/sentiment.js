@@ -251,8 +251,15 @@ export default async function handler(req, res) {
   const attention = calcAttention(messages.length, baseline30d);
   const momentum  = calcMomentum(sent.score, prev6hScore);
 
-  // AI summary (async, don't block)
-  const aiSummary = await getAISummary(symbol, sent, sent.textSamples);
+  // Rule-based summary — instant, no API call
+  const aiSummary = {
+    summary: `${symbol} sentiment is ${sent.score >= 60 ? 'bullish' : sent.score <= 40 ? 'bearish' : 'mixed'} on StockTwits. ${sent.bullPct}% bullish, ${sent.bearPct}% bearish across ${sent.totalMessages} recent messages from ${sent.uniqueAuthors} unique authors.`,
+    bullThemes: sent.bullPct > sent.bearPct ? ['Price momentum', 'Community interest'] : [],
+    bearThemes: sent.bearPct > sent.bullPct ? ['Caution', 'Selling pressure'] : [],
+    catalysts: [],
+    textSamples: sent.textSamples,
+    hasAI: false
+  };
 
   const result = {
     symbol,
