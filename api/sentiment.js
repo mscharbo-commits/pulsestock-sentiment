@@ -42,8 +42,11 @@ function calcSentiment(messages) {
   }
 
   const total = bull + bear + neutral || 1;
-  const rawScore = totalWeight > 0 ? (weightedSum / totalWeight) : 0;
-  const sentimentScore = Math.round(50 + rawScore * 50);
+  // Blend: 60% raw percentage, 40% engagement-weighted score
+  const rawPctScore = (bull - bear) / total; // -1 to +1
+  const rawEngScore = totalWeight > 0 ? (weightedSum / totalWeight) : 0;
+  const blended = rawPctScore * 0.6 + rawEngScore * 0.4;
+  const sentimentScore = Math.round(50 + blended * 50);
   const conviction = Math.round((tradeIntent / total) * 100);
 
   return {
