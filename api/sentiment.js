@@ -28,48 +28,68 @@ async function fetchStockTwits(symbol, limit = 30) {
   return data;
 }
 
+// Bullish/bearish word lists for text-based scoring
+const BULL_WORDS = /\b(buy|buying|bought|long|calls|moon|bullish|breakout|squeeze|rip|run|surge|spike|target|upside|catalyst|upgrade|beat|strong|growth|recovery|bounce|accumulate|load|dip|entry|adds|adding)\b/i;
+const BEAR_WORDS = /\b(sell|selling|sold|short|puts|dump|crash|drop|fall|bearish|breakdown|avoid|warning|downside|miss|weak|cut|downgrade|trap|bagholder|overvalued|resist|top|exit|out|flee|risk|concern|worried|caution|declining|red)\b/i;
+
+function textSentiment(body) {
+  const bullMatches = (body.match(BULL_WORDS) || []).length;
+  const bearMatches = (body.match(BEAR_WORDS) || []).length;
+  if (bullMatches > bearMatches) return 'Bullish';
+  if (bearMatches > bullMatches) return 'Bearish';
+  return null; // genuinely neutral
+}
+
 function calcSentiment(messages) {
-  // Weighted sentiment — likes + reshares as engagement weight
   let weightedSum = 0, totalWeight = 0;
   let bull = 0, bear = 0, neutral = 0;
+  let taggedBull = 0, taggedBear = 0, taggedNeutral = 0;
   let tradeIntent = 0;
   const authorSet = new Set();
   const textSamples = [];
 
   for (const m of messages) {
     const eng = 1 + (m.likes?.total || 0) * 2 + (m.reshares?.reshared_count || 0) * 3;
-    const sent = m.entities?.sentiment?.basic;
+    const taggedSent = m.entities?.sentiment?.basic; // explicit user tag
+    const body = m.body || '';
+    const inferredSent = taggedSent || textSentiment(body); // fall back to text
     authorSet.add(m.user?.username);
-    if (textSamples.length < 20) textSamples.push(m.body);
+    if (textSamples.length < 20) textSamples.push(body);
 
-    // Trade intent detection
-    const body = (m.body || '').toLowerCase();
-    if (/\b(bought|buying|selling|sold|calls|puts|position|entry|target|stop|long|short)\b/.test(body)) {
+    // Trade intent
+    if (/\b(bought|buying|selling|sold|calls|puts|position|entry|target|stop|long|short)\b/i.test(body)) {
       tradeIntent++;
     }
 
-    if (sent === 'Bullish') {
-      bull++; weightedSum += eng; totalWeight += eng;
-    } else if (sent === 'Bearish') {
-      bear++; weightedSum -= eng; totalWeight += eng;
+    // Tagged counts (for display)
+    if (taggedSent === 'Bullish') taggedBull++;
+    else if (taggedSent === 'Bearish') taggedBear++;
+    else taggedNeutral++;
+
+    // Scoring uses both tagged + inferred
+    // Tagged messages get full weight, text-inferred get 40% weight
+    const weight = taggedSent ? 1.0 : 0.4;
+    if (inferredSent === 'Bullish') {
+      bull++; weightedSum += eng * weight; totalWeight += eng * weight;
+    } else if (inferredSent === 'Bearish') {
+      bear++; weightedSum -= eng * weight; totalWeight += eng * weight;
     } else {
-      neutral++; totalWeight += eng * 0.3;
+      neutral++; totalWeight += eng * 0.1;
     }
   }
 
   const total = bull + bear + neutral || 1;
-  // Blend: 60% raw percentage, 40% engagement-weighted score
-  const rawPctScore = (bull - bear) / total; // -1 to +1
+  const taggedTotal = taggedBull + taggedBear + taggedNeutral || 1;
   const rawEngScore = totalWeight > 0 ? (weightedSum / totalWeight) : 0;
-  const blended = rawPctScore * 0.6 + rawEngScore * 0.4;
-  const sentimentScore = Math.round(50 + blended * 50);
+  const sentimentScore = Math.round(50 + rawEngScore * 50);
   const conviction = Math.round((tradeIntent / total) * 100);
 
   return {
     score: Math.max(0, Math.min(100, sentimentScore)),
-    bullPct: Math.round(bull / total * 100),
-    bearPct: Math.round(bear / total * 100),
-    neutralPct: Math.round(neutral / total * 100),
+    // Show TAGGED percentages in chart — honest about what users explicitly labeled
+    bullPct: Math.round(taggedBull / taggedTotal * 100),
+    bearPct: Math.round(taggedBear / taggedTotal * 100),
+    neutralPct: Math.round(taggedNeutral / taggedTotal * 100),
     totalMessages: messages.length,
     uniqueAuthors: authorSet.size,
     conviction: Math.min(100, conviction * 2),
