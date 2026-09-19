@@ -160,7 +160,7 @@ async function analyze() {
     if (!r.ok) throw new Error(data.error || 'Failed');
     renderResults(data);
     // Fetch AI summary separately so it doesn't block main data
-    if (!data.cached) fetchAISummary(data);
+    fetchAISummary(data); // always fetch AI summary
   } catch(e) {
     results.innerHTML = '<div class="error-msg">⚠ ' + e.message + '</div>';
   }
@@ -169,6 +169,7 @@ async function analyze() {
 
 async function fetchAISummary(data) {
   try {
+    console.log('[Sentiment] Calling /api/summary for', data.symbol);
     var r = await fetch('/api/summary', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
