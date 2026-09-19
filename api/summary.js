@@ -1,11 +1,16 @@
 // /api/summary.js — AI summary endpoint called separately after main data loads
 const ANT_KEY = process.env.ANTHROPIC_API_KEY;
 
+export const config = { api: { bodyParser: true } };
+
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
-  const { symbol, score, bullPct, bearPct, messages } = req.body || {};
+  // Parse body manually if needed
+  let body = req.body || {};
+  if (typeof body === 'string') { try { body = JSON.parse(body); } catch(e) {} }
+  const { symbol, score, bullPct, bearPct, messages } = body;
   if (!symbol) return res.status(400).json({ error: 'symbol required' });
 
   if (!ANT_KEY) {
