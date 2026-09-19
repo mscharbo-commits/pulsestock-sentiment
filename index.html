@@ -169,21 +169,40 @@ async function analyze() {
 
 async function fetchAISummary(data) {
   try {
+    var controller = new AbortController();
+    var timeout = setTimeout(function() {
+      controller.abort();
+      // Show fallback if timeout
+      renderAISummary(data.symbol, {
+        summary: data.symbol + ' has ' + data.bullPct + '% bullish and ' + data.bearPct + '% bearish sentiment on StockTwits across ' + data.totalMessages + ' recent messages.',
+        bullThemes: data.bullPct > data.bearPct ? ['Bullish momentum'] : [],
+        bearThemes: data.bearPct > data.bullPct ? ['Bearish pressure'] : [],
+        catalysts: [], hasAI: false
+      });
+    }, 12000);
+
     var r = await fetch('/api/summary', {
       method: 'POST',
+      signal: controller.signal,
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
         symbol: data.symbol,
         score: data.score,
         bullPct: data.bullPct,
         bearPct: data.bearPct,
-        messages: data.aiSummary?.textSamples || []
+        messages: data.aiSummary && data.aiSummary.textSamples ? data.aiSummary.textSamples : []
       })
     });
+    clearTimeout(timeout);
     var summary = await r.json();
-    // Update AI summary section in place
     renderAISummary(data.symbol, summary);
-  } catch(e) {}
+  } catch(e) {
+    // Show fallback on any error
+    renderAISummary(data.symbol, {
+      summary: data.symbol + ' sentiment: ' + data.score + '/100 (' + data.bullPct + '% bullish, ' + data.bearPct + '% bearish).',
+      bullThemes: [], bearThemes: [], catalysts: [], hasAI: false
+    });
+  }
 }
 
 function renderAISummary(symbol, s) {
