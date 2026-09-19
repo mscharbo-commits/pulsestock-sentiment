@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>PulseStock Sentiment</title>
+<style>
+:root {
+  --bg:#0A0E1A; --surface:#0D1421; --surface2:#111827;
+  --border:#1E2D45; --accent:#1A6BF5; --text:#F0F4FF;
+  --text2:#94A3B8; --text3:#475569;
+  --green:#10B981; --red:#EF4444; --amber:#F59E0B;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body { background:var(--bg); color:var(--text); font-family:'Inter',-apple-system,sans-serif; min-height:100vh; }
+.nav { display:flex; align-items:center; justify-content:space-between; padding:16px 32px; border-bottom:1px solid var(--border); }
+.logo { font-size:18px; font-weight:800; }
+.logo span { color:var(--accent); }
+.powered { font-size:11px; color:var(--text3); }
+.hero { text-align:center; padding:48px 24px 32px; }
+.hero h1 { font-size:36px; font-weight:800; margin-bottom:8px; }
+.hero h1 span { background:linear-gradient(135deg,#1A6BF5,#6366F1); -webkit-background-clip:text; -webkit-text-fill-color:transparent; }
+.hero p { color:var(--text2); font-size:15px; }
+.search-bar { display:flex; gap:10px; max-width:480px; margin:24px auto 0; }
+.search-bar input { flex:1; background:var(--surface); border:1px solid var(--border); border-radius:10px; color:var(--text); font-size:14px; padding:12px 16px; outline:none; font-family:inherit; }
+.search-bar input:focus { border-color:var(--accent); }
+.search-bar button { background:linear-gradient(135deg,#1A6BF5,#6366F1); color:#fff; border:none; border-radius:10px; padding:12px 24px; font-size:14px; font-weight:700; cursor:pointer; font-family:inherit; }
+.quick-tickers { display:flex; gap:8px; justify-content:center; flex-wrap:wrap; margin-top:16px; }
+.chip { background:var(--surface); border:1px solid var(--border); border-radius:20px; color:var(--text2); font-size:12px; font-weight:600; padding:5px 12px; cursor:pointer; transition:all .15s; }
+.chip:hover { border-color:var(--accent); color:var(--accent); }
+.container { max-width:1100px; margin:0 auto; padding:0 24px 48px; }
+#results { margin-top:32px; }
+.loading { text-align:center; padding:48px; color:var(--text3); }
+.error-msg { background:rgba(239,68,68,.1); border:1px solid rgba(239,68,68,.2); border-radius:10px; padding:16px; color:var(--red); text-align:center; margin-top:16px; }
+
+/* Score header */
+.score-header { background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:28px; margin-bottom:20px; }
+.score-top { display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px; }
+.score-left { display:flex; align-items:center; gap:20px; }
+.big-score { font-size:72px; font-weight:900; font-family:'DM Mono',monospace; line-height:1; }
+.big-score.bullish { color:var(--green); }
+.big-score.bearish { color:var(--red); }
+.big-score.neutral { color:var(--amber); }
+.score-label { font-size:18px; font-weight:700; margin-top:4px; }
+.score-sublabel { font-size:12px; color:var(--text2); margin-top:2px; }
+.score-badge { display:inline-block; font-size:11px; font-weight:700; padding:3px 10px; border-radius:20px; margin-top:6px; }
+.badge-bull { background:rgba(16,185,129,.15); color:var(--green); }
+.badge-bear { background:rgba(239,68,68,.15); color:var(--red); }
+.badge-neutral { background:rgba(245,158,11,.15); color:var(--amber); }
+.manip-warning { background:rgba(245,158,11,.08); border:1px solid rgba(245,158,11,.2); border-radius:8px; padding:8px 14px; font-size:12px; color:var(--amber); margin-top:12px; }
+
+/* Bar chart */
+.sentiment-bars { margin-top:20px; }
+.bar-row { display:flex; align-items:center; gap:10px; margin-bottom:8px; }
+.bar-label { width:60px; font-size:12px; color:var(--text2); text-align:right; }
+.bar-track { flex:1; background:var(--surface2); border-radius:4px; height:8px; overflow:hidden; }
+.bar-fill { height:100%; border-radius:4px; transition:width .6s ease; }
+.bar-pct { width:36px; font-size:12px; font-family:'DM Mono',monospace; color:var(--text2); }
+
+/* Four signals */
+.signals-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:20px; }
+.signal-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:18px; text-align:center; }
+.signal-val { font-size:36px; font-weight:800; font-family:'DM Mono',monospace; }
+.signal-name { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; color:var(--text3); margin-top:4px; }
+.signal-desc { font-size:11px; color:var(--text3); margin-top:4px; }
+.pos { color:var(--green); }
+.neg { color:var(--red); }
+.neu { color:var(--amber); }
+
+/* Stats row */
+.stats-row { display:flex; gap:24px; flex-wrap:wrap; margin-top:16px; padding-top:16px; border-top:1px solid var(--border); }
+.stat { display:flex; flex-direction:column; gap:2px; }
+.stat-val { font-size:18px; font-weight:700; font-family:'DM Mono',monospace; }
+.stat-label { font-size:11px; color:var(--text3); }
+
+/* AI Summary */
+.ai-card { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin-bottom:20px; }
+.ai-card-title { font-size:13px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px; display:flex; align-items:center; gap:6px; }
+.ai-summary-text { font-size:14px; color:var(--text2); line-height:1.7; margin-bottom:14px; }
+.themes-row { display:flex; gap:16px; flex-wrap:wrap; }
+.theme-col { flex:1; min-width:160px; }
+.theme-col-title { font-size:11px; font-weight:700; margin-bottom:8px; }
+.theme-tag { display:inline-block; background:var(--surface2); border:1px solid var(--border); border-radius:6px; font-size:11px; padding:3px 8px; margin:2px; color:var(--text2); }
+.theme-tag.bull { border-color:rgba(16,185,129,.3); color:var(--green); }
+.theme-tag.bear { border-color:rgba(239,68,68,.3); color:var(--red); }
+.catalyst-tag { border-color:rgba(26,107,245,.3); color:var(--accent); }
+
+/* Trending */
+.trending-section { margin-bottom:20px; }
+.trending-title { font-size:13px; font-weight:700; color:var(--text3); text-transform:uppercase; letter-spacing:.06em; margin-bottom:12px; }
+.trending-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px; }
+.trending-card { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:14px; cursor:pointer; transition:border-color .15s; }
+.trending-card:hover { border-color:var(--accent); }
+.trending-ticker { font-size:16px; font-weight:800; font-family:'DM Mono',monospace; }
+.trending-score { font-size:13px; font-weight:700; margin-top:4px; }
+
+/* Cached badge */
+.cached-badge { font-size:10px; color:var(--text3); margin-left:8px; }
+
+@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
+.fade-in { animation:fadeIn .3s ease; }
+
+@media(max-width:700px) {
+  .signals-grid { grid-template-columns:repeat(2,1fr); }
+  .big-score { font-size:52px; }
+  .nav { padding:12px 16px; }
+}
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="logo">Pulse<span>Sentiment</span></div>
+  <div class="powered">Powered by PulseStock · StockTwits</div>
+</nav>
+
+<div class="hero">
+  <h1>Social <span>Sentiment</span> Intelligence</h1>
+  <p>Real-time StockTwits sentiment analysis — weighted, manipulation-filtered, AI-summarized</p>
+  <div class="search-bar">
+    <input type="text" id="ticker-input" placeholder="Enter ticker... NVDA, AAPL, BTC" maxlength="10"
+      onkeydown="if(event.key==='Enter') analyze()"/>
+    <button onclick="analyze()">Analyze</button>
+  </div>
+  <div class="quick-tickers">
+    <span>Try:</span>
+    <button class="chip" onclick="quick('NVDA')">NVDA</button>
+    <button class="chip" onclick="quick('AAPL')">AAPL</button>
+    <button class="chip" onclick="quick('TSLA')">TSLA</button>
+    <button class="chip" onclick="quick('AMD')">AMD</button>
+    <button class="chip" onclick="quick('SPY')">SPY</button>
+    <button class="chip" onclick="quick('BTC.X')">BTC</button>
+    <button class="chip" onclick="quick('ETH.X')">ETH</button>
+  </div>
+</div>
+
+<div class="container">
+  <div id="results"></div>
+</div>
+
+<script>
+var loading = false;
+
+function quick(sym) {
+  document.getElementById('ticker-input').value = sym;
+  analyze();
+}
+
+async function analyze() {
+  if (loading) return;
+  var sym = (document.getElementById('ticker-input').value || '').trim().toUpperCase();
+  if (!sym) return;
+  loading = true;
+  var results = document.getElementById('results');
+  results.innerHTML = '<div class="loading">⚡ Analyzing ' + sym + ' sentiment...</div>';
+
+  try {
+    var r = await fetch('/api/sentiment?symbol=' + encodeURIComponent(sym));
+    var data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Failed');
+    renderResults(data);
+  } catch(e) {
+    results.innerHTML = '<div class="error-msg">⚠ ' + e.message + '</div>';
+  }
+  loading = false;
+}
+
+function scoreClass(score) {
+  if (score >= 60) return 'bullish';
+  if (score <= 40) return 'bearish';
+  return 'neutral';
+}
+
+function scoreBadge(score) {
+  if (score >= 80) return '<span class="score-badge badge-bull">EXTREMELY BULLISH</span>';
+  if (score >= 60) return '<span class="score-badge badge-bull">BULLISH</span>';
+  if (score <= 20) return '<span class="score-badge badge-bear">EXTREMELY BEARISH</span>';
+  if (score <= 40) return '<span class="score-badge badge-bear">BEARISH</span>';
+  return '<span class="score-badge badge-neutral">NEUTRAL / MIXED</span>';
+}
+
+function momClass(m) { return m > 0 ? 'pos' : m < 0 ? 'neg' : 'neu'; }
+function momStr(m) { return (m > 0 ? '+' : '') + m; }
+
+function attentionLabel(a) {
+  if (a >= 90) return 'EXTREME 🔥';
+  if (a >= 75) return 'VERY HIGH';
+  if (a >= 60) return 'HIGH';
+  if (a >= 40) return 'NORMAL';
+  return 'LOW';
+}
+
+function renderResults(d) {
+  var cls = scoreClass(d.score);
+  var cached = d.cached ? '<span class="cached-badge">· cached</span>' : '';
+
+  var aiHtml = '';
+  if (d.aiSummary) {
+    var bullTags = (d.aiSummary.bullThemes || []).map(t => `<span class="theme-tag bull">${t}</span>`).join('');
+    var bearTags = (d.aiSummary.bearThemes || []).map(t => `<span class="theme-tag bear">${t}</span>`).join('');
+    var catTags  = (d.aiSummary.catalysts  || []).map(t => `<span class="theme-tag catalyst-tag">${t}</span>`).join('');
+    aiHtml = `
+    <div class="ai-card fade-in">
+      <div class="ai-card-title">⚡ AI Summary</div>
+      <div class="ai-summary-text">${d.aiSummary.summary || ''}</div>
+      <div class="themes-row">
+        ${bullTags ? `<div class="theme-col"><div class="theme-col-title" style="color:var(--green)">▲ Bullish Themes</div>${bullTags}</div>` : ''}
+        ${bearTags ? `<div class="theme-col"><div class="theme-col-title" style="color:var(--red)">▼ Bearish Themes</div>${bearTags}</div>` : ''}
+        ${catTags  ? `<div class="theme-col"><div class="theme-col-title" style="color:var(--accent)">⚡ Catalysts</div>${catTags}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  var manipHtml = d.manipulation?.flag
+    ? `<div class="manip-warning">⚠ Abnormal promotion pattern detected — treat sentiment with caution (${d.manipulation.newAccountPct}% new accounts, ${d.manipulation.dupMessagePct}% duplicate messages)</div>`
+    : '';
+
+  document.getElementById('results').innerHTML = `
+    <div class="score-header fade-in">
+      <div class="score-top">
+        <div class="score-left">
+          <div>
+            <div class="big-score ${cls}">${d.score}</div>
+          </div>
+          <div>
+            <div class="score-label">$${d.symbol} ${cached}</div>
+            ${scoreBadge(d.score)}
+            <div class="score-sublabel" style="margin-top:6px;">Updated ${new Date(d.updatedAt).toLocaleTimeString()}</div>
+          </div>
+        </div>
+        <div style="text-align:right;">
+          <div style="font-size:12px;color:var(--text3);margin-bottom:4px;">SENTIMENT SCORE</div>
+          <div style="font-size:11px;color:var(--text3);">0 = Extreme Bear · 100 = Extreme Bull</div>
+        </div>
+      </div>
+
+      <div class="sentiment-bars">
+        <div class="bar-row">
+          <div class="bar-label" style="color:var(--green)">Bullish</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${d.bullPct}%;background:var(--green)"></div></div>
+          <div class="bar-pct">${d.bullPct}%</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label" style="color:var(--text3)">Neutral</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${d.neutralPct}%;background:var(--text3)"></div></div>
+          <div class="bar-pct">${d.neutralPct}%</div>
+        </div>
+        <div class="bar-row">
+          <div class="bar-label" style="color:var(--red)">Bearish</div>
+          <div class="bar-track"><div class="bar-fill" style="width:${d.bearPct}%;background:var(--red)"></div></div>
+          <div class="bar-pct">${d.bearPct}%</div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat"><div class="stat-val">${d.totalMessages}</div><div class="stat-label">Messages (30 recent)</div></div>
+        <div class="stat"><div class="stat-val">${d.uniqueAuthors}</div><div class="stat-label">Unique Authors</div></div>
+        <div class="stat"><div class="stat-val" style="color:${d.manipulation?.flag?'var(--amber)':'var(--green)'}">${d.manipulation?.risk || 0}</div><div class="stat-label">Manip. Risk Score</div></div>
+      </div>
+      ${manipHtml}
+    </div>
+
+    <div class="signals-grid fade-in">
+      <div class="signal-card">
+        <div class="signal-val ${cls}">${d.score}</div>
+        <div class="signal-name">Sentiment</div>
+        <div class="signal-desc">Weighted bull/bear score</div>
+      </div>
+      <div class="signal-card">
+        <div class="signal-val ${d.attention >= 75 ? 'pos' : d.attention <= 40 ? 'neg' : 'neu'}">${d.attention}</div>
+        <div class="signal-name">Attention</div>
+        <div class="signal-desc">${attentionLabel(d.attention)}</div>
+      </div>
+      <div class="signal-card">
+        <div class="signal-val ${momClass(d.momentum)}">${momStr(d.momentum)}</div>
+        <div class="signal-name">Momentum</div>
+        <div class="signal-desc">vs 6hr ago</div>
+      </div>
+      <div class="signal-card">
+        <div class="signal-val ${d.conviction >= 50 ? 'pos' : 'neu'}">${d.conviction}</div>
+        <div class="signal-name">Conviction</div>
+        <div class="signal-desc">Trade intent %</div>
+      </div>
+    </div>
+
+    ${aiHtml}
+  `;
+}
+</script>
+</body>
+</html>
