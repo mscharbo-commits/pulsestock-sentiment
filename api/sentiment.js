@@ -80,12 +80,13 @@ function calcMomentum(currentScore, previousScore) {
 function detectManipulation(messages) {
   const total = messages.length || 1;
   const newAccounts = messages.filter(m => {
-    const created = new Date(m.user?.created_at || Date.now());
-    const daysSince = (Date.now() - created) / 86400000;
+    if (!m.user?.created_at) return false;
+    const created = new Date(m.user.created_at);
+    const daysSince = (Date.now() - created.getTime()) / 86400000;
     return daysSince < 30;
   }).length;
 
-  const lowFollowers = messages.filter(m => (m.user?.followers || 0) < 10).length;
+  const lowFollowers = messages.filter(m => (m.user?.followers_count || m.user?.followers || 0) < 10).length;
 
   // Check for repeated phrases
   const bodies = messages.map(m => (m.body || '').toLowerCase().trim());
