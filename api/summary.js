@@ -20,9 +20,7 @@ export default async function handler(req, res) {
     hasAI: false
   };
 
-  console.log('[Summary] ANT_KEY present:', !!ANT_KEY, 'symbol:', symbol);
   if (!ANT_KEY) {
-    console.log('[Summary] No API key — returning fallback');
     return res.status(200).json(fallback);
   }
 
@@ -44,18 +42,14 @@ export default async function handler(req, res) {
       })
     });
 
-    const respText = await r.text();
-    console.log('[Summary] Anthropic status:', r.status, 'response:', respText.substring(0,200));
     if (!r.ok) return res.status(200).json(fallback);
-    const data = JSON.parse(respText);
+    const data = await r.json();
     const text = data.content?.[0]?.text || '';
-    console.log('[Summary] AI text:', text.substring(0,200));
     const match = text.match(/\{[\s\S]*\}/);
     if (!match) return res.status(200).json(fallback);
     const parsed = JSON.parse(match[0]);
     return res.status(200).json({ ...parsed, hasAI: true });
   } catch(e) {
-    console.error('[Summary] Error:', e.message);
     return res.status(200).json(fallback);
   }
 }
