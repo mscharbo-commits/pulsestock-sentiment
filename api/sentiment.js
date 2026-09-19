@@ -7,9 +7,25 @@ const ANT_KEY  = process.env.ANTHROPIC_API_KEY;
 
 async function fetchStockTwits(symbol, limit = 30) {
   const url = `https://api.stocktwits.com/api/2/streams/symbol/${symbol}.json?limit=${limit}`;
-  const r = await fetch(url, { headers: { 'User-Agent': 'PulseStock/1.0' } });
+  const r = await fetch(url, { headers: { 'User-Agent': 'Mozilla/5.0 PulseStock/1.0' } });
   if (!r.ok) return null;
-  return r.json();
+  const data = await r.json();
+
+  // Also try to fetch their official sentiment score
+  try {
+    const sr = await fetch(`https://api.stocktwits.com/api/2/symbols/search.json?q=${symbol}`, {
+      headers: { 'User-Agent': 'Mozilla/5.0 PulseStock/1.0' }
+    });
+    if (sr.ok) {
+      const sd = await sr.json();
+      const sym = (sd.results || []).find(s => s.symbol === symbol);
+      if (sym?.sentiment) {
+        data.officialSentiment = sym.sentiment;
+      }
+    }
+  } catch(e) {}
+
+  return data;
 }
 
 function calcSentiment(messages) {
@@ -241,6 +257,17 @@ export default async function handler(req, res) {
   const messages = data.messages;
   const sent = calcSentiment(messages);
   const manipulation = detectManipulation(messages);
+
+  // Use StockTwits official sentiment score if available (24hr window, much more accurate)
+  const stSentiment = data.symbol?.sentiment;
+  const stVolume = data.symbol?.watchlist_count;
+  if (stSentiment && stSentiment.basic) {
+    // StockTwits returns 'Bullish' or 'Bearish' as basic sentiment
+    // and a score 0-100 in some API versions
+    const stScore = stSentiment.score !== undefined ? stSentiment.score : (stSentiment.basic === 'Bullish' ? 65 : 35);
+    // Blend: 70% StockTwits official, 30% our tag-based calc
+    sent.score = Math.round(stScore * 0.7 + sent.score * 0.3);
+  }
 
   // Get baseline from history for attention/momentum
   const history = await getCachedBaseline(symbol);
