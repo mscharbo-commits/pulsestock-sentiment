@@ -168,7 +168,6 @@ async function analyze() {
 }
 
 async function fetchAISummary(data) {
-  console.log('[Sentiment] Fetching AI summary for', data.symbol);
   var payload = JSON.stringify({
     symbol: data.symbol,
     score: data.score,
@@ -185,15 +184,12 @@ async function fetchAISummary(data) {
     body: payload
   })
   .then(function(r) {
-    console.log('[Sentiment] Summary status:', r.status);
     return r.json();
   })
   .then(function(s) {
-    console.log('[Sentiment] Summary OK:', s.hasAI);
     renderAISummary(data.symbol, s);
   })
   .catch(function(e) {
-    console.error('[Sentiment] Summary failed:', e.message);
     renderAISummary(data.symbol, {
       summary: '$' + data.symbol + ' shows ' + (data.score >= 60 ? 'bullish' : data.score <= 40 ? 'bearish' : 'mixed') + ' community sentiment at ' + data.score + '/100. ' + data.bullPct + '% bullish, ' + data.bearPct + '% bearish across ' + data.totalMessages + ' recent messages.',
       bullThemes: data.bullPct > data.bearPct ? ['Bullish momentum', 'Community interest'] : [],
