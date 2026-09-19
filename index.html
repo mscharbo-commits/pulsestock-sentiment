@@ -168,39 +168,29 @@ async function analyze() {
 }
 
 async function fetchAISummary(data) {
-  try {
-    var controller = new AbortController();
-    var timeout = setTimeout(function() {
-      controller.abort();
-      // Show fallback if timeout
-      renderAISummary(data.symbol, {
-        summary: data.symbol + ' has ' + data.bullPct + '% bullish and ' + data.bearPct + '% bearish sentiment on StockTwits across ' + data.totalMessages + ' recent messages.',
-        bullThemes: data.bullPct > data.bearPct ? ['Bullish momentum'] : [],
-        bearThemes: data.bearPct > data.bullPct ? ['Bearish pressure'] : [],
-        catalysts: [], hasAI: false
-      });
-    }, 12000);
+  var messages = data.aiSummary && data.aiSummary.textSamples ? data.aiSummary.textSamples : [];
+  var prompt = 'Analyze StockTwits sentiment for $' + data.symbol + '. Score: ' + data.score + '/100 (' + data.bullPct + '% bull, ' + data.bearPct + '% bear, ' + data.neutralPct + '% neutral). ' + data.totalMessages + ' messages from ' + data.uniqueAuthors + ' authors.\n\nSample messages:\n' + messages.slice(0,8).join('\n') + '\n\nReturn ONLY valid JSON: {"summary":"2 sentences about what community is saying","bullThemes":["theme1","theme2"],"bearThemes":["theme1"],"catalysts":["any catalyst or empty array"]}';
 
-    var r = await fetch('/api/summary', {
+  try {
+    var r = await fetch('https://pulsestock-nu.vercel.app/api/chat', {
       method: 'POST',
-      signal: controller.signal,
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        symbol: data.symbol,
-        score: data.score,
-        bullPct: data.bullPct,
-        bearPct: data.bearPct,
-        messages: data.aiSummary && data.aiSummary.textSamples ? data.aiSummary.textSamples : []
+        system: 'You are a financial sentiment analyst. Return only valid JSON, no other text.',
+        messages: [{role: 'user', content: prompt}]
       })
     });
-    clearTimeout(timeout);
-    var summary = await r.json();
-    renderAISummary(data.symbol, summary);
+    var resp = await r.json();
+    var text = resp.content && resp.content[0] && resp.content[0].text || '';
+    var clean = text.replace(/```json|```/g, '').trim();
+    var parsed = JSON.parse(clean);
+    renderAISummary(data.symbol, Object.assign(parsed, {hasAI: true}));
   } catch(e) {
-    // Show fallback on any error
     renderAISummary(data.symbol, {
-      summary: data.symbol + ' sentiment: ' + data.score + '/100 (' + data.bullPct + '% bullish, ' + data.bearPct + '% bearish).',
-      bullThemes: [], bearThemes: [], catalysts: [], hasAI: false
+      summary: '$' + data.symbol + ' shows ' + (data.score >= 60 ? 'bullish' : data.score <= 40 ? 'bearish' : 'mixed') + ' sentiment at ' + data.score + '/100 with ' + data.bullPct + '% of tagged messages bullish and ' + data.bearPct + '% bearish.',
+      bullThemes: data.bullPct > data.bearPct ? ['Price action', 'Community interest'] : [],
+      bearThemes: data.bearPct > data.bullPct ? ['Caution', 'Risk'] : [],
+      catalysts: [], hasAI: false
     });
   }
 }
