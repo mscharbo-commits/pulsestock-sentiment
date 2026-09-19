@@ -168,26 +168,23 @@ async function analyze() {
 }
 
 async function fetchAISummary(data) {
-  var messages = data.aiSummary && data.aiSummary.textSamples ? data.aiSummary.textSamples : [];
-  var prompt = 'Analyze StockTwits sentiment for $' + data.symbol + '. Score: ' + data.score + '/100 (' + data.bullPct + '% bull, ' + data.bearPct + '% bear, ' + data.neutralPct + '% neutral). ' + data.totalMessages + ' messages from ' + data.uniqueAuthors + ' authors.\n\nSample messages:\n' + messages.slice(0,8).join('\n') + '\n\nReturn ONLY valid JSON: {"summary":"2 sentences about what community is saying","bullThemes":["theme1","theme2"],"bearThemes":["theme1"],"catalysts":["any catalyst or empty array"]}';
-
   try {
-    var r = await fetch('https://pulsestock-nu.vercel.app/api/chat', {
+    var r = await fetch('/api/summary', {
       method: 'POST',
       headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({
-        system: 'You are a financial sentiment analyst. Return only valid JSON, no other text.',
-        messages: [{role: 'user', content: prompt}]
+        symbol: data.symbol,
+        score: data.score,
+        bullPct: data.bullPct,
+        bearPct: data.bearPct,
+        neutralPct: data.neutralPct,
+        totalMessages: data.totalMessages,
+        uniqueAuthors: data.uniqueAuthors,
+        messages: data.aiSummary && data.aiSummary.textSamples ? data.aiSummary.textSamples : []
       })
     });
-    var resp = await r.json();
-    var text = resp.content && resp.content[0] && resp.content[0].text || '';
-    // Extract JSON from anywhere in response
-    var jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) throw new Error('No JSON in response');
-    var parsed = JSON.parse(jsonMatch[0]);
-    if (!parsed.summary) throw new Error('Missing summary field');
-    renderAISummary(data.symbol, Object.assign(parsed, {hasAI: true}));
+    var summary = await r.json();
+    renderAISummary(data.symbol, summary);
   } catch(e) {
     renderAISummary(data.symbol, {
       summary: '$' + data.symbol + ' shows ' + (data.score >= 60 ? 'bullish' : data.score <= 40 ? 'bearish' : 'mixed') + ' sentiment at ' + data.score + '/100 with ' + data.bullPct + '% of tagged messages bullish and ' + data.bearPct + '% bearish.',
