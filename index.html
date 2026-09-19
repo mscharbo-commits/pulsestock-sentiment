@@ -168,33 +168,41 @@ async function analyze() {
 }
 
 async function fetchAISummary(data) {
-  try {
-    console.log('[Sentiment] Calling /api/summary for', data.symbol);
-    var r = await fetch('/api/summary', {
-      method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        symbol: data.symbol,
-        score: data.score,
-        bullPct: data.bullPct,
-        bearPct: data.bearPct,
-        neutralPct: data.neutralPct,
-        totalMessages: data.totalMessages,
-        uniqueAuthors: data.uniqueAuthors,
-        messages: data.aiSummary && data.aiSummary.textSamples ? data.aiSummary.textSamples : []
-      })
-    });
-    var summary = await r.json();
-    renderAISummary(data.symbol, summary);
-  } catch(e) {
+  console.log('[Sentiment] Fetching AI summary for', data.symbol);
+  var payload = JSON.stringify({
+    symbol: data.symbol,
+    score: data.score,
+    bullPct: data.bullPct,
+    bearPct: data.bearPct,
+    neutralPct: data.neutralPct,
+    totalMessages: data.totalMessages,
+    uniqueAuthors: data.uniqueAuthors,
+    messages: data.aiSummary && data.aiSummary.textSamples ? data.aiSummary.textSamples : []
+  });
+  fetch('/api/summary', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: payload
+  })
+  .then(function(r) {
+    console.log('[Sentiment] Summary status:', r.status);
+    return r.json();
+  })
+  .then(function(s) {
+    console.log('[Sentiment] Summary OK:', s.hasAI);
+    renderAISummary(data.symbol, s);
+  })
+  .catch(function(e) {
+    console.error('[Sentiment] Summary failed:', e.message);
     renderAISummary(data.symbol, {
-      summary: '$' + data.symbol + ' shows ' + (data.score >= 60 ? 'bullish' : data.score <= 40 ? 'bearish' : 'mixed') + ' sentiment at ' + data.score + '/100 with ' + data.bullPct + '% of tagged messages bullish and ' + data.bearPct + '% bearish.',
-      bullThemes: data.bullPct > data.bearPct ? ['Price action', 'Community interest'] : [],
-      bearThemes: data.bearPct > data.bullPct ? ['Caution', 'Risk'] : [],
+      summary: '$' + data.symbol + ' shows ' + (data.score >= 60 ? 'bullish' : data.score <= 40 ? 'bearish' : 'mixed') + ' community sentiment at ' + data.score + '/100. ' + data.bullPct + '% bullish, ' + data.bearPct + '% bearish across ' + data.totalMessages + ' recent messages.',
+      bullThemes: data.bullPct > data.bearPct ? ['Bullish momentum', 'Community interest'] : [],
+      bearThemes: data.bearPct > data.bullPct ? ['Selling pressure', 'Caution'] : [],
       catalysts: [], hasAI: false
     });
-  }
+  });
 }
+
 
 function renderAISummary(symbol, s) {
   var el = document.getElementById('ai-summary-section');
